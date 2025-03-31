@@ -2,6 +2,7 @@
   "name": "pomodoro-timer",
   "version": "0.1.0",
   "private": true,
+  "homepage": "https://jayant114.github.io/pomodoro-timer",
   "dependencies": {
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
@@ -13,7 +14,8 @@
     "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
-    "deploy": "vercel"
+    "predeploy": "npm run build",
+    "deploy": "gh-pages -d build"
   },
   "eslintConfig": {
     "extends": [
@@ -34,6 +36,7 @@
     ]
   },
   "devDependencies": {
+    "gh-pages": "^6.3.0",
     "vercel": "^41.4.1"
   }
 }
