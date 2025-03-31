@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import styled from 'styled-components';
 import { GemIcon } from './components/GemIcon';
 import { Timer } from './components/Timer';
@@ -80,6 +80,7 @@ function App() {
   const [isPaused, setIsPaused] = useState(true);
   const [time, setTime] = useState(40 * 60); // 40 minutes in seconds
   const [gems, setGems] = useLocalStorage('pomodoro-gems', 0);
+  const audioRef = useRef(null);
   
   useEffect(() => {
     let interval = null;
@@ -95,6 +96,10 @@ function App() {
             setIsActive(false);
             setIsPaused(true);
             setGems(gems => gems + 1);
+            // Play completion sound
+            if (audioRef.current) {
+              audioRef.current.play().catch(e => console.error("Error playing sound:", e));
+            }
             return 40 * 60;
           }
         });
@@ -134,6 +139,7 @@ function App() {
   
   return (
     <>
+      <audio ref={audioRef} src={`${process.env.PUBLIC_URL}/sounds/timer-complete.mp3`} />
       <GodRays 
         angle={0.8}
         position={0.8}
