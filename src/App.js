@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { GemIcon } from './components/GemIcon';
 import { Timer } from './components/Timer';
+import { GodRays } from './components/GodRays';
+import { LightEffect } from './components/LightEffect';
 import { useLocalStorage } from './hooks/useLocalStorage';
 
 const AppContainer = styled.div`
@@ -12,7 +14,9 @@ const AppContainer = styled.div`
   min-height: 100vh;
   padding: 20px;
   text-align: center;
-  background: #000000;
+  background: transparent;
+  position: relative;
+  z-index: 1;
 `;
 
 const Header = styled.header`
@@ -28,7 +32,6 @@ const DateDisplay = styled.div`
   font-weight: 400;
   font-size: 16px;
   opacity: 0.8;
-  font-style: italic;
 `;
 
 const GemCounter = styled.div`
@@ -47,19 +50,18 @@ const MainContent = styled.main`
   justify-content: center;
   align-items: center;
   width: 100%;
-  margin-top: -40px; /* Move content up a bit */
+  margin-top: -160px; /* Move content up a bit */
 `;
 
 const Title = styled.h1`
-  font-size: 3.5rem;
+  font-size: 120px;
   font-weight: 400;
   margin-bottom: 40px;
-  background: linear-gradient(90deg, #4169E1, #DA70D6);
+  background: linear-gradient(135deg, #175b90, #e787be);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   text-align: center;
-  letter-spacing: 1px;
-  font-style: italic;
+  letter-spacing: -0.01em; /* -1% character spacing */
 `;
 
 const Footer = styled.footer`
@@ -76,7 +78,7 @@ const formatDate = () => {
 function App() {
   const [isActive, setIsActive] = useState(false);
   const [isPaused, setIsPaused] = useState(true);
-  const [time, setTime] = useState(25 * 60); // 25 minutes in seconds
+  const [time, setTime] = useState(40 * 60); // 40 minutes in seconds
   const [gems, setGems] = useLocalStorage('pomodoro-gems', 0);
   
   useEffect(() => {
@@ -93,7 +95,7 @@ function App() {
             setIsActive(false);
             setIsPaused(true);
             setGems(gems => gems + 1);
-            return 25 * 60;
+            return 40 * 60;
           }
         });
       }, 1000);
@@ -120,7 +122,7 @@ function App() {
   const handleReset = () => {
     setIsActive(false);
     setIsPaused(true);
-    setTime(25 * 60);
+    setTime(40 * 60);
   };
   
   const formatTime = () => {
@@ -131,32 +133,49 @@ function App() {
   };
   
   return (
-    <AppContainer>
-      <Header>
-        <DateDisplay>{formatDate()}</DateDisplay>
-        <GemCounter>
-          <GemIcon size={20} />
-          <span>{gems} gems collected</span>
-        </GemCounter>
-      </Header>
-      
-      <MainContent>
-        <Title>Be present in now</Title>
-        <Timer 
-          time={formatTime()} 
-          isActive={isActive} 
-          isPaused={isPaused}
-          onStart={handleStart}
-          onPause={handlePause}
-          onResume={handleResume}
-          onReset={handleReset}
-        />
-      </MainContent>
-      
-      <Footer>
-        {/* Footer content if needed */}
-      </Footer>
-    </AppContainer>
+    <>
+      <GodRays 
+        angle={0.8}
+        position={0.8}
+        spread={0.2}
+        cutoff={0.05}
+        falloff={0.3}
+        edge_fade={0.5}
+        speed={0.1}
+        ray1_density={4.0}
+        ray2_density={14.0}
+        ray2_intensity={0.2}
+        color={[0.969, 0.969, 0.969, 0.0]}
+        seed={5.0}
+      />
+      <LightEffect />
+      <AppContainer>
+        <Header>
+          <DateDisplay>{formatDate()}</DateDisplay>
+          <GemCounter>
+            <GemIcon size={20} />
+            <span>{gems} gems collected</span>
+          </GemCounter>
+        </Header>
+        
+        <MainContent>
+          <Title>Be present in now</Title>
+          <Timer 
+            time={formatTime()} 
+            isActive={isActive} 
+            isPaused={isPaused}
+            onStart={handleStart}
+            onPause={handlePause}
+            onResume={handleResume}
+            onReset={handleReset}
+          />
+        </MainContent>
+        
+        <Footer>
+          {/* Footer content if needed */}
+        </Footer>
+      </AppContainer>
+    </>
   );
 }
 

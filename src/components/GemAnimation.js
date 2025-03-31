@@ -31,7 +31,7 @@ const BlurCircle = styled.div`
   height: 240px;
   border-radius: 50%;
   background-color: #303dff;
-  filter: blur(225px);
+  filter: blur(160px);
   z-index: 0;
 `;
 

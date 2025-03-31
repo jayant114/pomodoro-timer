@@ -1,6 +1,7 @@
 import React from 'react';
 import styled from 'styled-components';
 import { GemAnimation } from './GemAnimation';
+import ResetIcon from './ResetIcon';
 
 const TimerContainer = styled.div`
   display: flex;
@@ -22,16 +23,15 @@ const GemSection = styled.div`
 `;
 
 const ControlsSection = styled.div`
-  width: 100%;
-  max-width: 700px;
-  background-color: rgba(18, 18, 40, 0.9);
+  width: auto;
+  display: inline-flex;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.01) 100%);
   border-radius: 100px;
-  padding: 12px 20px;
-  display: flex;
+  padding: 20px 28px 20px 36px;
   flex-direction: row;
   align-items: center;
   justify-content: space-between;
-  backdrop-filter: blur(5px);
+  backdrop-filter: blur(12px);
   box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
   border: 1px solid transparent;
   background-clip: padding-box;
@@ -47,7 +47,7 @@ const ControlsSection = styled.div`
     bottom: 0;
     border-radius: 100px;
     padding: 1px;
-    background: linear-gradient(to right, #373737, #D9D9D9);
+    background: linear-gradient(150deg, rgba(217, 217, 217, 0.2), rgba(55, 55, 55, 0.2));
     -webkit-mask: 
       linear-gradient(#fff 0 0) content-box, 
       linear-gradient(#fff 0 0);
@@ -62,34 +62,50 @@ const ControlsSection = styled.div`
 `;
 
 const TimerDisplay = styled.div`
-  font-size: 72px;
-  font-weight: 300;
+  font-size: 48px;
+  font-weight: 400;
   color: #E0E0FF;
   line-height: 1;
-  letter-spacing: 4px;
+  letter-spacing: -0.01em;
   margin: 0;
-  padding-left: 25px;
-  font-family: 'Instrument Serif', Georgia, serif;
+`;
+
+const ButtonsWrapper = styled.div`
+  position: relative;
+  height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
 `;
 
 const ControlButton = styled.button`
-  background-color: #242080;
+  background-color: ${props => props.variant === 'primary' ? '#4425A7' : '#8B0065'};
   color: white;
   border: none;
-  border-radius: 50px;
-  padding: 10px 28px;
-  font-size: 22px;
+  border-radius: ${props => props.round ? '50%' : '50px'};
+  padding: ${props => props.round ? '0' : '10px 28px'};
+  width: ${props => {
+    if (props.round) return '72px';
+    if (props.start) return '208px';
+    return '140px';
+  }};
+  height: 72px;
+  font-size: 28px;
   font-weight: 400;
-  font-family: 'Instrument Serif', Georgia, serif;
+  font-family: "Instrument Serif", serif;
   cursor: pointer;
   transition: all 0.3s ease;
-  letter-spacing: 0.5px;
+  letter-spacing: -0.01em;
   margin: 0;
-  max-width: 250px;
   white-space: nowrap;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  box-shadow: ${props => props.variant === 'primary' ? '0 0 0 2px rgba(78, 134, 255, 0.5)' : 'none'};
 
   &:hover {
-    background-color: #4B0082;
+    background-color: ${props => props.variant === 'primary' ? '#3A1F94' : '#A30075'};
   }
 
   &:disabled {
@@ -100,8 +116,9 @@ const ControlButton = styled.button`
 
 const ButtonContainer = styled.div`
   display: flex;
-  flex-direction: column;
-  gap: 10px;
+  flex-direction: row;
+  gap: 12px;
+  align-items: center;
 `;
 
 export const Timer = ({ 
@@ -122,23 +139,39 @@ export const Timer = ({
       <ControlsSection>
         <TimerDisplay>{time}</TimerDisplay>
         
-        <ButtonContainer>
+        <ButtonsWrapper>
           {!isActive && (
-            <ControlButton onClick={onStart}>Start focusing</ControlButton>
+            <ControlButton 
+              variant="primary" 
+              start 
+              onClick={onStart}
+            >
+              Start focusing
+            </ControlButton>
           )}
           
-          {isActive && isPaused && (
-            <ControlButton onClick={onResume}>Resume</ControlButton>
+          {isActive && (
+            <ButtonContainer>
+              {isPaused ? (
+                <ControlButton variant="primary" onClick={onResume}>
+                  Resume
+                </ControlButton>
+              ) : (
+                <ControlButton variant="primary" onClick={onPause}>
+                  Pause
+                </ControlButton>
+              )}
+              
+              <ControlButton 
+                round 
+                variant="secondary" 
+                onClick={onReset}
+              >
+                <ResetIcon size={32} />
+              </ControlButton>
+            </ButtonContainer>
           )}
-          
-          {isActive && !isPaused && (
-            <ControlButton onClick={onPause}>Pause</ControlButton>
-          )}
-          
-          {isActive && isPaused && (
-            <ControlButton onClick={onReset} style={{ backgroundColor: 'rgba(75, 0, 130, 0.5)' }}>Reset</ControlButton>
-          )}
-        </ButtonContainer>
+        </ButtonsWrapper>
       </ControlsSection>
     </TimerContainer>
   );
