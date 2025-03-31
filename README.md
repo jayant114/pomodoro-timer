@@ -23,7 +23,7 @@ A beautiful Pomodoro timer application that helps you stay focused with 25-minut
 
 1. Clone the repository
 ```
-git clone https://github.com/yourusername/pomodoro-timer.git
+git clone https://github.com/jayant114/pomodoro-timer.git
 cd pomodoro-timer
 ```
 
@@ -67,4 +67,4 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 ## Acknowledgments
 
 - Inspired by the Pomodoro Technique developed by Francesco Cirillo
-- Built with React and styled-components 
+- Built with React and styled-components
