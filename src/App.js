@@ -70,6 +70,11 @@ const Footer = styled.footer`
   padding: 20px 0;
 `;
 
+const formatDate = () => {
+  const options = { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' };
+  return new Date().toLocaleDateString('en-US', options);
+};
+
 const SESSION_DURATION = 40 * 60; // 40 minutes in seconds
 
 function App() {
