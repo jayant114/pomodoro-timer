@@ -78,63 +78,128 @@ const formatDate = () => {
 function App() {
   const [isActive, setIsActive] = useState(false);
   const [isPaused, setIsPaused] = useState(true);
-  const [time, setTime] = useState(40 * 60); // 40 minutes in seconds
+  const [time, setTime] = useState(40 * 60); // Time remaining in seconds
   const [gems, setGems] = useLocalStorage('pomodoro-gems', 0);
   const audioRef = useRef(null);
+  const startTimeRef = useRef(null); // Timestamp when timer (re)started
+  const pauseTimeRef = useRef(null); // Remaining time (seconds) when paused
+  const intervalRef = useRef(null); // Ref to store the interval ID
   
   useEffect(() => {
-    let interval = null;
-    
-    if (isActive && !isPaused) {
-      interval = setInterval(() => {
-        setTime(time => {
-          if (time > 0) {
-            return time - 1;
-          } else {
-            // Session completed
-            clearInterval(interval);
-            setIsActive(false);
-            setIsPaused(true);
-            setGems(gems => gems + 1);
-            // Play completion sound
-            if (audioRef.current) {
-              audioRef.current.play().catch(e => console.error("Error playing sound:", e));
-            }
-            return 40 * 60;
-          }
-        });
-      }, 1000);
-    } else {
-      clearInterval(interval);
+    // Clear previous interval if dependencies change
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
     }
-    
-    return () => clearInterval(interval);
+
+    if (isActive && !isPaused) {
+      // If startTimeRef is null, it means we need to set the start time.
+      // This happens on initial start or on resume.
+      if (startTimeRef.current === null) {
+           startTimeRef.current = Date.now();
+           // If pauseTimeRef is null, we are starting fresh (or after a reset).
+           // Ensure the time state is set to the full duration if starting fresh.
+           if (pauseTimeRef.current === null) {
+               setTime(40 * 60);
+           }
+      }
+
+      // The time duration we are counting down from.
+      // If resuming, it's the time saved at pause. Otherwise, it's the full duration.
+      const durationToCountDownFrom = pauseTimeRef.current !== null ? pauseTimeRef.current : 40 * 60;
+
+      intervalRef.current = setInterval(() => {
+        const elapsedMilliseconds = Date.now() - startTimeRef.current;
+        const remainingTime = durationToCountDownFrom - Math.floor(elapsedMilliseconds / 1000);
+
+        if (remainingTime > 0) {
+          setTime(remainingTime);
+        } else {
+          // Session completed
+          setTime(0); // Show 0:00
+          clearInterval(intervalRef.current); // Use ref to clear
+          intervalRef.current = null;
+          setIsActive(false);
+          setIsPaused(true);
+          setGems(gems => gems + 1); // Use callback form
+
+          // Play completion sound
+          if (audioRef.current) {
+            audioRef.current.play().catch(e => console.error("Error playing sound:", e));
+          }
+
+          // Reset refs for the completed session
+          startTimeRef.current = null;
+          pauseTimeRef.current = null;
+        }
+      }, 100); // Check frequently for smoother display updates
+
+    } else {
+      // If timer becomes inactive (paused or reset), clear start time ref.
+       if (isPaused || !isActive) {
+           startTimeRef.current = null;
+       }
+    }
+
+    // Cleanup function to clear interval when component unmounts or effect re-runs
+    return () => {
+        if (intervalRef.current) {
+            clearInterval(intervalRef.current);
+            intervalRef.current = null;
+        }
+    };
+  // Dependencies: isActive and isPaused control the interval logic.
+  // setGems is included as it's used in the completion logic.
   }, [isActive, isPaused, setGems]);
   
   const handleStart = () => {
     setIsActive(true);
     setIsPaused(false);
+    setTime(40 * 60); // Explicitly set time on new start
+    startTimeRef.current = Date.now(); // Record start time
+    pauseTimeRef.current = null; // Clear any previous paused state
   };
   
   const handlePause = () => {
     setIsPaused(true);
+    // When pausing, record the *current* remaining time from the state
+    pauseTimeRef.current = time;
+    // Clear start time ref since elapsed time calculation stops
+    startTimeRef.current = null;
+     // Clear interval via effect cleanup by changing isPaused state
   };
   
   const handleResume = () => {
     setIsPaused(false);
+    // Record the time when resuming. The effect will use pauseTimeRef.current.
+    startTimeRef.current = Date.now();
+    // Effect will restart the interval
   };
   
   const handleReset = () => {
     setIsActive(false);
     setIsPaused(true);
     setTime(40 * 60);
+    // Clear refs
+    startTimeRef.current = null;
+    pauseTimeRef.current = null;
+    // Clear interval via effect cleanup
+    // Stop potential sound if reset during playback (edge case)
+     if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+     }
   };
   
   const formatTime = () => {
     const minutes = Math.floor(time / 60);
     const seconds = time % 60;
-    
-    return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+
+    // Ensure time doesn't display negative values if there's a slight delay
+    const displayMinutes = Math.max(0, minutes);
+    const displaySeconds = Math.max(0, seconds);
+
+    return `${displayMinutes}:${displaySeconds < 10 ? '0' : ''}${displaySeconds}`;
   };
   
   return (
