@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import styled from 'styled-components';
 import { GemIcon } from './components/GemIcon';
 import { Timer } from './components/Timer';
@@ -70,141 +70,117 @@ const Footer = styled.footer`
   padding: 20px 0;
 `;
 
-const formatDate = () => {
-  const options = { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' };
-  return new Date().toLocaleDateString('en-US', options);
-};
+const SESSION_DURATION = 40 * 60; // 40 minutes in seconds
 
 function App() {
-  const [isActive, setIsActive] = useState(false);
-  const [isPaused, setIsPaused] = useState(true);
-  const [time, setTime] = useState(40 * 60); // Time remaining in seconds
+  const [isActive, setIsActive] = useState(false); // Is the session active (started and not reset)?
+  const [isPaused, setIsPaused] = useState(true); // Is the timer ticking or paused?
+  const [time, setTime] = useState(SESSION_DURATION);
   const [gems, setGems] = useLocalStorage('pomodoro-gems', 0);
   const audioRef = useRef(null);
-  const startTimeRef = useRef(null); // Timestamp when timer (re)started
-  const pauseTimeRef = useRef(null); // Remaining time (seconds) when paused
-  const intervalRef = useRef(null); // Ref to store the interval ID
-  
+  const workerRef = useRef(null);
+
+  // Effect to initialize and manage the Web Worker
   useEffect(() => {
-    // Clear previous interval if dependencies change
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
-    }
+    // Create worker instance
+    // Note: The path must be relative to the public folder for Create React App
+    workerRef.current = new Worker(`${process.env.PUBLIC_URL}/timer.worker.js`);
 
-    if (isActive && !isPaused) {
-      // If startTimeRef is null, it means we need to set the start time.
-      // This happens on initial start or on resume.
-      if (startTimeRef.current === null) {
-           startTimeRef.current = Date.now();
-           // If pauseTimeRef is null, we are starting fresh (or after a reset).
-           // Ensure the time state is set to the full duration if starting fresh.
-           if (pauseTimeRef.current === null) {
-               setTime(40 * 60);
-           }
-      }
+    console.log("Worker created:", workerRef.current);
 
-      // The time duration we are counting down from.
-      // If resuming, it's the time saved at pause. Otherwise, it's the full duration.
-      const durationToCountDownFrom = pauseTimeRef.current !== null ? pauseTimeRef.current : 40 * 60;
+    // Listen for messages from the worker
+    workerRef.current.onmessage = (event) => {
+        const { type, time: workerTime } = event.data;
+        console.log("App: Received message from worker", event.data);
 
-      intervalRef.current = setInterval(() => {
-        const elapsedMilliseconds = Date.now() - startTimeRef.current;
-        const remainingTime = durationToCountDownFrom - Math.floor(elapsedMilliseconds / 1000);
-
-        if (remainingTime > 0) {
-          setTime(remainingTime);
-        } else {
-          // Session completed
-          setTime(0); // Show 0:00
-          clearInterval(intervalRef.current); // Use ref to clear
-          intervalRef.current = null;
-          setIsActive(false);
-          setIsPaused(true);
-          setGems(gems => gems + 1); // Use callback form
-
-          // Play completion sound
-          if (audioRef.current) {
-            audioRef.current.play().catch(e => console.error("Error playing sound:", e));
-          }
-
-          // Reset refs for the completed session
-          startTimeRef.current = null;
-          pauseTimeRef.current = null;
-        }
-      }, 100); // Check frequently for smoother display updates
-
-    } else {
-      // If timer becomes inactive (paused or reset), clear start time ref.
-       if (isPaused || !isActive) {
-           startTimeRef.current = null;
-       }
-    }
-
-    // Cleanup function to clear interval when component unmounts or effect re-runs
-    return () => {
-        if (intervalRef.current) {
-            clearInterval(intervalRef.current);
-            intervalRef.current = null;
+        if (type === 'tick') {
+            setTime(workerTime);
+        } else if (type === 'completed') {
+            setTime(0);
+            setIsActive(false); // Session is no longer active
+            setIsPaused(true); // Set to paused state
+            setGems(prevGems => prevGems + 1);
+            // Play sound
+            if (audioRef.current) {
+                audioRef.current.play().catch(e => console.error("Error playing sound:", e));
+            }
+            // Reset timer state visually to initial duration after completion
+            // Use a timeout to allow sound to play and UI to update
+            setTimeout(() => setTime(SESSION_DURATION), 100); 
         }
     };
-  // Dependencies: isActive and isPaused control the interval logic.
-  // setGems is included as it's used in the completion logic.
-  }, [isActive, isPaused, setGems]);
-  
-  const handleStart = () => {
+
+    workerRef.current.onerror = (error) => {
+        console.error("Worker error:", error);
+    };
+
+    // Cleanup: Terminate the worker when the component unmounts
+    return () => {
+        console.log("Terminating worker");
+        workerRef.current.terminate();
+        workerRef.current = null;
+    };
+  }, [setGems]); // setGems is stable, so this runs only once on mount
+
+  // Memoized handlers to prevent unnecessary re-renders
+  const handleStart = useCallback(() => {
+    console.log("App: handleStart");
     setIsActive(true);
     setIsPaused(false);
-    setTime(40 * 60); // Explicitly set time on new start
-    startTimeRef.current = Date.now(); // Record start time
-    pauseTimeRef.current = null; // Clear any previous paused state
-  };
-  
-  const handlePause = () => {
+    // Send start command to worker with the session duration
+    if (workerRef.current) {
+        workerRef.current.postMessage({ command: 'start', duration: SESSION_DURATION });
+    }
+  }, []);
+
+  const handlePause = useCallback(() => {
+    console.log("App: handlePause");
     setIsPaused(true);
-    // When pausing, record the *current* remaining time from the state
-    pauseTimeRef.current = time;
-    // Clear start time ref since elapsed time calculation stops
-    startTimeRef.current = null;
-     // Clear interval via effect cleanup by changing isPaused state
-  };
-  
-  const handleResume = () => {
+    if (workerRef.current) {
+        workerRef.current.postMessage({ command: 'pause' });
+    }
+  }, []);
+
+  const handleResume = useCallback(() => {
+    console.log("App: handleResume");
     setIsPaused(false);
-    // Record the time when resuming. The effect will use pauseTimeRef.current.
-    startTimeRef.current = Date.now();
-    // Effect will restart the interval
-  };
-  
-  const handleReset = () => {
+    if (workerRef.current) {
+        workerRef.current.postMessage({ command: 'resume' });
+    }
+  }, []);
+
+  const handleReset = useCallback(() => {
+    console.log("App: handleReset");
     setIsActive(false);
     setIsPaused(true);
-    setTime(40 * 60);
-    // Clear refs
-    startTimeRef.current = null;
-    pauseTimeRef.current = null;
-    // Clear interval via effect cleanup
-    // Stop potential sound if reset during playback (edge case)
-     if (audioRef.current) {
+    // Send reset command to worker
+    if (workerRef.current) {
+        workerRef.current.postMessage({ command: 'reset', duration: SESSION_DURATION });
+    }
+    // Reset UI immediately
+    setTime(SESSION_DURATION);
+
+    // Stop potential sound if reset during playback
+    if (audioRef.current) {
         audioRef.current.pause();
         audioRef.current.currentTime = 0;
-     }
-  };
-  
+    }
+  }, []);
+
   const formatTime = () => {
     const minutes = Math.floor(time / 60);
     const seconds = time % 60;
 
-    // Ensure time doesn't display negative values if there's a slight delay
     const displayMinutes = Math.max(0, minutes);
     const displaySeconds = Math.max(0, seconds);
 
     return `${displayMinutes}:${displaySeconds < 10 ? '0' : ''}${displaySeconds}`;
   };
-  
+
   return (
     <>
-      <audio ref={audioRef} src={`${process.env.PUBLIC_URL}/sounds/timer-complete.mp3`} />
+      {/* Use a unique key for the audio element if issues arise with src changes */}
+      <audio ref={audioRef} src={`${process.env.PUBLIC_URL}/sounds/timer-complete.mp3`} preload="auto" />
       <GodRays 
         angle={0.8}
         position={0.8}
