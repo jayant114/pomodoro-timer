@@ -82,29 +82,51 @@ function App() {
   const [isPaused, setIsPaused] = useState(true); // Is the timer ticking or paused?
   const [time, setTime] = useState(SESSION_DURATION);
   const [gems, setGems] = useLocalStorage('pomodoro-gems', 0);
-  const audioRef = useRef(null);
+  const completionSoundRef = useRef(null);
+  const startSoundRef = useRef(null);
+  const pauseSoundRef = useRef(null);
+  const resetSoundRef = useRef(null);
   const workerRef = useRef(null);
 
-  // Add an effect to handle audio loading
+  // Effect to handle audio loading for all sounds
   useEffect(() => {
+    const sounds = [
+      { ref: completionSoundRef, name: 'completion' },
+      { ref: startSoundRef, name: 'start' },
+      { ref: pauseSoundRef, name: 'pause' },
+      { ref: resetSoundRef, name: 'reset' }
+    ];
+
+    sounds.forEach(({ ref, name }) => {
+      if (ref.current) {
+        ref.current.addEventListener('loadeddata', () => {
+          console.log(`${name} sound loaded successfully`);
+        });
+        ref.current.addEventListener('error', (e) => {
+          console.error(`Error loading ${name} sound:`, e);
+        });
+      }
+    });
+  }, []);
+
+  // Helper function to play UI sounds
+  const playSound = useCallback(async (audioRef) => {
     if (audioRef.current) {
-      audioRef.current.addEventListener('loadeddata', () => {
-        console.log('Audio file loaded successfully');
-      });
-      audioRef.current.addEventListener('error', (e) => {
-        console.error('Error loading audio file:', e);
-      });
+      try {
+        audioRef.current.currentTime = 0;
+        audioRef.current.volume = 0.5; // Lower volume for UI sounds
+        await audioRef.current.play();
+      } catch (error) {
+        console.error('Error playing sound:', error);
+      }
     }
   }, []);
 
   // Effect to initialize and manage the Web Worker
   useEffect(() => {
-    // Create worker instance
     workerRef.current = new Worker(`${process.env.PUBLIC_URL}/timer.worker.js`);
-
     console.log("Worker created:", workerRef.current);
 
-    // Listen for messages from the worker
     workerRef.current.onmessage = (event) => {
         const { type, time: workerTime } = event.data;
         console.log("App: Received message from worker", event.data);
@@ -117,34 +139,19 @@ function App() {
             setIsPaused(true);
             setGems(prevGems => prevGems + 1);
             
-            // Enhanced sound playing logic with better error handling
-            if (audioRef.current) {
-                console.log('Attempting to play sound...');
-                // Reset the audio to the beginning
-                audioRef.current.currentTime = 0;
-                // Set volume to make sure it's not muted
-                audioRef.current.volume = 1;
-                
-                const playPromise = audioRef.current.play();
+            // Play completion sound
+            if (completionSoundRef.current) {
+                completionSoundRef.current.currentTime = 0;
+                completionSoundRef.current.volume = 1;
+                const playPromise = completionSoundRef.current.play();
                 if (playPromise !== undefined) {
                     playPromise
-                        .then(() => {
-                            console.log('Sound played successfully');
-                        })
-                        .catch(error => {
-                            console.error('Error playing sound:', error);
-                            // If autoplay was prevented, show a message or handle it appropriately
-                            if (error.name === 'NotAllowedError') {
-                                console.log('Autoplay was prevented. User interaction is required.');
-                            }
-                        });
-                } else {
-                    console.error('Audio element not found');
+                        .then(() => console.log('Completion sound played successfully'))
+                        .catch(error => console.error('Error playing completion sound:', error));
                 }
-
-                // Reset timer state visually after completion
-                setTimeout(() => setTime(SESSION_DURATION), 100);
             }
+
+            setTimeout(() => setTime(SESSION_DURATION), 100);
         }
     };
 
@@ -152,58 +159,57 @@ function App() {
         console.error("Worker error:", error);
     };
 
-    // Cleanup: Terminate the worker when the component unmounts
     return () => {
         console.log("Terminating worker");
         workerRef.current.terminate();
         workerRef.current = null;
     };
-  }, [setGems]); // setGems is stable, so this runs only once on mount
+  }, [setGems]);
 
-  // Memoized handlers to prevent unnecessary re-renders
   const handleStart = useCallback(() => {
     console.log("App: handleStart");
     setIsActive(true);
     setIsPaused(false);
-    // Send start command to worker with the session duration
+    playSound(startSoundRef);
     if (workerRef.current) {
         workerRef.current.postMessage({ command: 'start', duration: SESSION_DURATION });
     }
-  }, []);
+  }, [playSound]);
 
   const handlePause = useCallback(() => {
     console.log("App: handlePause");
     setIsPaused(true);
+    playSound(pauseSoundRef);
     if (workerRef.current) {
         workerRef.current.postMessage({ command: 'pause' });
     }
-  }, []);
+  }, [playSound]);
 
   const handleResume = useCallback(() => {
     console.log("App: handleResume");
     setIsPaused(false);
+    playSound(startSoundRef); // Use start sound for resume too
     if (workerRef.current) {
         workerRef.current.postMessage({ command: 'resume' });
     }
-  }, []);
+  }, [playSound]);
 
   const handleReset = useCallback(() => {
     console.log("App: handleReset");
     setIsActive(false);
     setIsPaused(true);
-    // Send reset command to worker
+    playSound(resetSoundRef);
     if (workerRef.current) {
         workerRef.current.postMessage({ command: 'reset', duration: SESSION_DURATION });
     }
-    // Reset UI immediately
     setTime(SESSION_DURATION);
 
-    // Stop potential sound if reset during playback
-    if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current.currentTime = 0;
+    // Stop potential completion sound if reset during playback
+    if (completionSoundRef.current) {
+        completionSoundRef.current.pause();
+        completionSoundRef.current.currentTime = 0;
     }
-  }, []);
+  }, [playSound]);
 
   const formatTime = () => {
     const minutes = Math.floor(time / 60);
@@ -217,14 +223,30 @@ function App() {
 
   return (
     <>
+      {/* Audio elements for all sounds */}
       <audio 
-        ref={audioRef} 
+        ref={completionSoundRef} 
         src={`${process.env.PUBLIC_URL}/sounds/timer-complete.mp3`} 
         preload="auto"
-        // Add these attributes to ensure audio can play
         playsInline
-        controls={false}
-        crossOrigin="anonymous"
+      />
+      <audio 
+        ref={startSoundRef} 
+        src={`${process.env.PUBLIC_URL}/sounds/start.mp3`} 
+        preload="auto"
+        playsInline
+      />
+      <audio 
+        ref={pauseSoundRef} 
+        src={`${process.env.PUBLIC_URL}/sounds/pause.mp3`} 
+        preload="auto"
+        playsInline
+      />
+      <audio 
+        ref={resetSoundRef} 
+        src={`${process.env.PUBLIC_URL}/sounds/reset.mp3`} 
+        preload="auto"
+        playsInline
       />
       <GodRays 
         angle={0.8}
