@@ -85,10 +85,21 @@ function App() {
   const audioRef = useRef(null);
   const workerRef = useRef(null);
 
+  // Add an effect to handle audio loading
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.addEventListener('loadeddata', () => {
+        console.log('Audio file loaded successfully');
+      });
+      audioRef.current.addEventListener('error', (e) => {
+        console.error('Error loading audio file:', e);
+      });
+    }
+  }, []);
+
   // Effect to initialize and manage the Web Worker
   useEffect(() => {
     // Create worker instance
-    // Note: The path must be relative to the public folder for Create React App
     workerRef.current = new Worker(`${process.env.PUBLIC_URL}/timer.worker.js`);
 
     console.log("Worker created:", workerRef.current);
@@ -102,16 +113,38 @@ function App() {
             setTime(workerTime);
         } else if (type === 'completed') {
             setTime(0);
-            setIsActive(false); // Session is no longer active
-            setIsPaused(true); // Set to paused state
+            setIsActive(false);
+            setIsPaused(true);
             setGems(prevGems => prevGems + 1);
-            // Play sound
+            
+            // Enhanced sound playing logic with better error handling
             if (audioRef.current) {
-                audioRef.current.play().catch(e => console.error("Error playing sound:", e));
+                console.log('Attempting to play sound...');
+                // Reset the audio to the beginning
+                audioRef.current.currentTime = 0;
+                // Set volume to make sure it's not muted
+                audioRef.current.volume = 1;
+                
+                const playPromise = audioRef.current.play();
+                if (playPromise !== undefined) {
+                    playPromise
+                        .then(() => {
+                            console.log('Sound played successfully');
+                        })
+                        .catch(error => {
+                            console.error('Error playing sound:', error);
+                            // If autoplay was prevented, show a message or handle it appropriately
+                            if (error.name === 'NotAllowedError') {
+                                console.log('Autoplay was prevented. User interaction is required.');
+                            }
+                        });
+                } else {
+                    console.error('Audio element not found');
+                }
+
+                // Reset timer state visually after completion
+                setTimeout(() => setTime(SESSION_DURATION), 100);
             }
-            // Reset timer state visually to initial duration after completion
-            // Use a timeout to allow sound to play and UI to update
-            setTimeout(() => setTime(SESSION_DURATION), 100); 
         }
     };
 
@@ -184,8 +217,15 @@ function App() {
 
   return (
     <>
-      {/* Use a unique key for the audio element if issues arise with src changes */}
-      <audio ref={audioRef} src={`${process.env.PUBLIC_URL}/sounds/timer-complete.mp3`} preload="auto" />
+      <audio 
+        ref={audioRef} 
+        src={`${process.env.PUBLIC_URL}/sounds/timer-complete.mp3`} 
+        preload="auto"
+        // Add these attributes to ensure audio can play
+        playsInline
+        controls={false}
+        crossOrigin="anonymous"
+      />
       <GodRays 
         angle={0.8}
         position={0.8}
