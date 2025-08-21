@@ -13,7 +13,7 @@ export const GemIcon = ({ size = 24 }) => {
   // Use the Cloudinary gem image
   return (
     <GemImage 
-      src="https://res.cloudinary.com/dotswmlfr/image/upload/v1743074502/jayant1239_a_rare_gem_black_background_premium_surreal_shiny_mu_7a90f93e-364f-44a6-80d4-96221d757991-removebg-preview_goinek.png" 
+      src="https://ik.imagekit.io/aaoge3hhs/gem.png?updatedAt=1755765496704" 
       alt="Gem Icon"
       size={size}
     />
